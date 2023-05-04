@@ -88,7 +88,7 @@ void classify(){
     }
 }
 
-
-int main(){
-      
+int main() {
+    classify();
+    return 0;
 }
