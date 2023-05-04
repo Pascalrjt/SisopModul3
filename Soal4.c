@@ -1,21 +1,12 @@
 #include <stdio.h>
-
 #include <stdlib.h>
-
 #include <string.h>
-
 #include <dirent.h>
-
 #include <pthread.h>
-
 #include <sys/stat.h>
-
 #include <unistd.h>
-
 #include <errno.h>
-
 #include <fcntl.h>
-
 #include <time.h>
 
 #define MAX_PATH 1024
