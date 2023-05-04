@@ -1,82 +1,34 @@
-#include<stdio.h>
-#include<stdlib.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
-#include <sys/wait.h>
-#include<sys/stat.h>
 #include <dirent.h>
-#define URL "https://drive.google.com/uc?export=download&id=1oDgj5kSiDO0tlyS7-20uz7t20X3atwrq"
-#define ZIP_FILENAME "file.zip"
-char *POSISI[] = {"HewanAir", "HewanAmphibi", "HewanDarat"};
-char *FILE_CATEGORY[] = {"air.jpg", "amphibi.jpg", "darat.jpg"};
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <pthread.h>
 
-
-void download() {
-    pid_t pid;
-    int status;
-
-    pid = fork();
-    if (pid == 0) {
-        execl("/usr/bin/wget", "wget", "-q", "-O", ZIP_FILENAME, URL, NULL);
-        printf("Error: Failed to execute wget. errno=%d\n", errno);
-        exit(EXIT_FAILURE);
-    } else if (pid > 0) {
-        waitpid(pid, &status, 0);
-    } else {
-        printf("Error: Failed to fork.\n");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void extract() {
-    pid_t pid;
-    int status;
-    pid = fork();
-    if (pid == 0) {
-        execl("/usr/bin/unzip", "unzip", ZIP_FILENAME, NULL);
-        printf("Error: Failed to execute unzip. errno=%d\n", errno);
-        exit(EXIT_FAILURE);
-    } else if (pid > 0) {
-        waitpid(pid, &status, 0);
-    } else {
-        printf("Error: Failed to fork.\n");
-        exit(EXIT_FAILURE);
-    }
-
-}
-
-void remove_zip() {
-    pid_t pid;
-    int status;
-    pid = fork();
-    if (pid == 0) {
-        execl("/bin/rm", "rm", ZIP_FILENAME, NULL);
-        printf("Error: Failed to execute rm. errno=%d\n", errno);
-        exit(EXIT_FAILURE);
-    } else if (pid > 0) {
-        waitpid(pid, &status, 0);
-    } else {
-        printf("Error: Failed to fork.\n");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void arrange_animal(int i) {
+void *arrange_animal(void *arg) {
+    char *dir_path = (char*) arg;
     DIR *dir;
     struct dirent *ent;
-    char path[100] = "/home/riskiilyas/Desktop/SISOP/";
-    char dir_path[100] = "/home/riskiilyas/Desktop/SISOP/";
-    strcat(dir_path, POSISI[i]);
+    char path[100] = "home/doscuments/praktikum/modul3"; //"/home/riskiilyas/Desktop/SISOP/" 
     char buffer[256];
     char *token;
+    char *ext;
     const char *delimiter = "_";
-    mkdir(POSISI[i], S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    char ext_file_path[100];
+    sprintf(ext_file_path, "%s/extension.txt", dir_path);
+    FILE *ext_file = fopen(ext_file_path, "r");
+    if (ext_file == NULL) {
+        printf("Error: Failed to open format file for %s.\n", dir_path);
+        pthread_exit(NULL);
+    }
+    mkdir(dir_path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
     dir = opendir(path);
     if (dir == NULL) {
         printf("Error: Failed to open directory.\n");
-        exit(EXIT_FAILURE);
+        pthread_exit(NULL);
     }
 
     while ((ent = readdir(dir)) != NULL) {
@@ -84,59 +36,59 @@ void arrange_animal(int i) {
             continue;
         }
         strcpy(buffer, ent->d_name);
-        token = strtok(buffer, delimiter);
-        while (token != NULL) {
-            if (strcmp(token, FILE_CATEGORY[i]) == 0) {
-                char file_path[100];
-                strcpy(file_path, path);
-                strcat(file_path, ent->d_name);
-                printf("%s", file_path);
-                int pid = fork();
-                if(pid == 0) {
-                    char *argv2[] = {"cp", file_path, dir_path, NULL};
-                    execv("/bin/cp", argv2);
-                } else {
-                    wait(NULL);
-                }
-                remove(file_path);
+        token = strtok(buffer, ".");
+        ext = strtok(NULL, ".");
+        if (ext == NULL) {
+            continue;
+        }
+        fseek(ext_file, 0, SEEK_SET);
+        int found_ext = 0;
+        char line[100];
+        while (fgets(line, 100, ext_file) != NULL) {
+            if (line[strlen(line) - 1] == '\n') {
+                line[strlen(line) - 1] = '\0';
+            }
+            if (strcmp(line, ext) == 0) {
+                found_ext = 1;
                 break;
             }
-            token = strtok(NULL, delimiter);
+        }
+        if (found_ext) {
+            char file_path[100];
+            strcpy(file_path, path);
+            strcat(file_path, ent->d_name);
+            printf("%s", file_path);
+            char new_path[100];
+            strcpy(new_path, dir_path);
+            strcat(new_path, "/");
+            strcat(new_path, ent->d_name);
+            if (rename(file_path, new_path) != 0) {
+                printf("Error: Failed to move file %s\n", file_path);
+            }
         }
     }
 
+    fclose(ext_file);
     closedir(dir);
+    pthread_exit(NULL);
 }
 
 void classify(){
-    pid_t pid[3];
+    pthread_t tid[3];
+    const char* POSISI[] = {"petshop/cat", "petshop/dog", "petshop/other"};
     for(int i=0 ;i<3; i++) {
-        pid[i] = fork();
-        if(pid[i]==-1) {
-            perror("Failed to Create Proccess!!");
+        if (pthread_create(&tid[i], NULL, arrange_animal, (void*) POSISI[i]) != 0) {
+            perror("Failed to create thread!!");
             exit(EXIT_FAILURE);
-        } else if(pid[i]==0) {
-            arrange_animal(i);
-            exit(EXIT_SUCCESS);
         }
     }
 
     for(int i=0;i<3;i++) {
-        waitpid(pid[i], NULL, 0);
+        pthread_join(tid[i], NULL);
     }
 }
 
-void zip(){
-    char zipFileName[] = "grapekun.zip";
-    char* cmd[] = {"zip", "-r", zipFileName, POSISI[0], POSISI[1], POSISI[2], NULL};
-    execvp("zip", cmd);
-}
 
 int main(){
-    download();
-    extract();
-    remove_zip();
-    classify();
-    zip();
-    return 0;
+      
 }
