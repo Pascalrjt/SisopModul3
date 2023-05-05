@@ -24,6 +24,7 @@ void readExtensions(char extensions[][256]) {
     while (fgets(extensions[i], 256, fp)) {
         // Remove the newline character from the end of the string
         extensions[i][strcspn(extensions[i], "\n")] = 0;
+        printf("%s\n", extensions[i]);
         i++;
     }
 
@@ -101,7 +102,6 @@ int main() {
     for (int i = 0; i < thread_count; i++) {
         pthread_join(thread_id[i], NULL);
     }
-
     // Close the directory
     closedir(dir);
 
