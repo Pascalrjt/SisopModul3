@@ -29,12 +29,14 @@ void readExtensions(char extensions[][256]) {
     }
 
     fclose(fp);
+    return i;
 }
 
 // Function to check if a file has a specified extension
 int hasExtension(char *filename, char *extension) {
     char *dot = strrchr(filename, '.');
     if (dot && !strcmp(dot + 1, extension)) {
+        printf("file found\n");
         return 1;
     }
     return 0;
@@ -61,10 +63,55 @@ void *sortFile(void *arg) {
     pthread_exit(NULL);
 }
 
+// Function to count the number of each extension and print out the results
+void countExtensions(char extensions[][256], int numExtensions) {
+    DIR *dir = opendir("files");
+    if (dir == NULL) {
+        perror("opendir error");
+        exit(EXIT_FAILURE);
+    }
+
+    int counts[numExtensions + 1]; // +1 for "other" category
+    for (int i = 0; i <= numExtensions; i++) {
+        counts[i] = 0;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type == DT_REG) {
+            char *filename = entry->d_name;
+            int foundExtension = 0;
+            for (int i = 0; i < numExtensions; i++) {
+                if (hasExtension(filename, extensions[i])) {
+                    foundExtension = 1;
+                    counts[i]++;
+                    break;
+                }
+            }
+            if (!foundExtension) {
+                counts[numExtensions]++;
+            }
+        }
+    }
+
+    closedir(dir);
+
+    printf("File Extension Counts:\n");
+    for (int i = 0; i < numExtensions; i++) {
+        printf("%s: %d\n", extensions[i], counts[i]);
+    }
+    printf("Other: %d\n", counts[numExtensions]);
+}
+
+
+
 int main() {
     // Read the extensions from extensions.txt
     char extensions[256][256];
     readExtensions(extensions);
+
+    int numExtensions = readExtensions(extensions);
+    countExtensions(extensions, numExtensions);
 
     // Open the directory containing the unsorted files
     DIR *dir = opendir("files");
@@ -76,6 +123,7 @@ int main() {
     // Create the threads to sort the files
     pthread_t thread_id[1024];
     int thread_count = 0;
+    //int counter = 0;
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
@@ -87,6 +135,7 @@ int main() {
                     File *file = malloc(sizeof(File));
                     strcpy(file->filename, filename);
                     strcpy(file->extension, extensions[i]);
+                    //counter++;
 
                     // Create a thread to sort the file
                     pthread_create(&thread_id[thread_count], NULL, sortFile, file);
@@ -94,6 +143,8 @@ int main() {
 
                     break;
                 }
+                //printf("%d\n", counter);
+                //counter = 0;
             }
         }
     }
